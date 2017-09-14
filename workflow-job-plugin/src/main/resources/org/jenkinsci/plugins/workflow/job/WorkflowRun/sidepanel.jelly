@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?jelly escape-by-default='true'?>
+<!--
+  ~ The MIT License
+  ~
+  ~ Copyright (c) 2013-2014, CloudBees, Inc.
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy
+  ~ of this software and associated documentation files (the "Software"), to deal
+  ~ in the Software without restriction, including without limitation the rights
+  ~ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  ~ copies of the Software, and to permit persons to whom the Software is
+  ~ furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in
+  ~ all copies or substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  ~ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  ~ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  ~ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  ~ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  ~ THE SOFTWARE.
+  -->
+
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:p="/lib/hudson/project">
+    <l:side-panel>
+        <l:tasks>
+            <j:set var="buildUrl" value="${h.decompose(request)}"/>
+            <l:task icon="images/24x24/up.png" href="${rootURL}/${it.parent.url}" title="${%Back to Project}" contextMenu="false"/>
+            <l:task icon="images/24x24/search.png" href="${buildUrl.baseUrl}/" title="${%Status}" contextMenu="false"/>
+            <l:task icon="images/24x24/notepad.png" href="${buildUrl.baseUrl}/changes" title="${%Changes}"/>
+            <p:console-link/>
+            <l:task icon="images/24x24/notepad.png" href="${buildUrl.baseUrl}/configure" title="${h.hasPermission(it,it.UPDATE)?'%Edit Build Information':'%View Build Information'}"/>
+            <st:include page="delete.jelly"/>
+            <j:if test="${it.hasAllowTerm()}">
+                <l:task icon="images/24x24/edit-delete.png"
+                        href="${buildUrl.baseUrl}/term"
+                        title="${%Abort Running Steps}"
+                        contextMenu="false"
+                        post="true"
+                        permission="${it.CANCEL}"
+                        requiresConfirmation="true"
+                        confirmationMessage="${%Really forcibly abort running steps?}"/>
+            </j:if>
+            <j:if test="${it.hasAllowKill()}">
+                <l:task icon="images/24x24/edit-delete.png"
+                        href="${buildUrl.baseUrl}/kill"
+                        title="${%Force Abort of Entire Build}"
+                        contextMenu="false"
+                        post="true"
+                        permission="${it.CANCEL}"
+                        requiresConfirmation="true"
+                        confirmationMessage="${%Really forcibly abort entire build?}"/>
+            </j:if>
+            <j:forEach var="action" items="${it.allActions}">
+                <!--
+                  allow the action to take over the rendering, but otherwise fall back to the default
+                  the action object itself is available in the 'action' variable
+                -->
+                <j:if test="${it.checkAction(action)}">
+                    <st:include page="action.jelly" from="${action}" optional="true">
+                        <j:set var="icon" value="${action.iconClassName != null ? action.iconClassName + ' icon-md' : action.iconFileName}"/>
+                        <j:if test="${icon!=null}">
+                            <l:task icon="${icon}" title="${action.displayName}"
+                                    href="${h.getActionUrl(it.url,action)}" contextMenu="${h.isContextMenuVisible(action)}"/>
+                        </j:if>
+                    </st:include>
+                </j:if>
+            </j:forEach>
+
+            <j:if test="${it.previousBuild!=null}">
+                <l:task icon="images/24x24/previous.png" href="${buildUrl.previousBuildUrl}" title="${%Previous Build}" contextMenu="false"/>
+            </j:if>
+            <j:if test="${it.nextBuild!=null}">
+                <l:task icon="images/24x24/next.png" href="${buildUrl.nextBuildUrl}" title="${%Next Build}" contextMenu="false"/>
+            </j:if>
+        </l:tasks>
+    </l:side-panel>
+</j:jelly>

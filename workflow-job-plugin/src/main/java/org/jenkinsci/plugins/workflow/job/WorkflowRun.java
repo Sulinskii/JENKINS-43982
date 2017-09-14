@@ -106,86 +106,6 @@ import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.interceptor.RequirePOST;
-///
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import hudson.AbortException;
-import hudson.BulkChange;
-import hudson.Extension;
-import hudson.ExtensionList;
-import hudson.FilePath;
-import hudson.Functions;
-import hudson.Launcher;
-import hudson.init.InitMilestone;
-import hudson.init.Initializer;
-import hudson.model.Action;
-import hudson.model.BallColor;
-import hudson.model.Computer;
-import hudson.model.Descriptor;
-import hudson.model.DescriptorVisibilityFilter;
-import hudson.model.Item;
-import hudson.model.ItemGroup;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.JobProperty;
-import hudson.model.Label;
-import hudson.model.Node;
-import hudson.model.Queue;
-import hudson.model.ResourceList;
-import hudson.model.Run;
-import hudson.model.RunMap;
-import hudson.model.TaskListener;
-import hudson.model.TopLevelItem;
-import hudson.model.TopLevelItemDescriptor;
-import hudson.model.listeners.SCMListener;
-import hudson.model.queue.CauseOfBlockage;
-import hudson.model.queue.QueueTaskFuture;
-import hudson.model.queue.SubTask;
-import hudson.scm.PollingResult;
-import hudson.scm.SCM;
-import hudson.scm.SCMRevisionState;
-import hudson.search.SearchIndexBuilder;
-import hudson.security.ACL;
-import hudson.slaves.WorkspaceList;
-import hudson.triggers.SCMTrigger;
-import hudson.triggers.Trigger;
-import hudson.triggers.TriggerDescriptor;
-import hudson.util.AlternativeUiTextProvider;
-import hudson.util.DescribableList;
-import hudson.widgets.HistoryWidget;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
-import jenkins.model.BlockedBecauseOfBuildInProgress;
-import jenkins.model.Jenkins;
-import jenkins.model.ParameterizedJobMixIn;
-import jenkins.model.lazy.LazyBuildMixIn;
-import jenkins.triggers.SCMTriggerItem;
-import net.sf.json.JSONObject;
-import org.acegisecurity.Authentication;
-import org.jenkinsci.plugins.workflow.flow.FlowDefinition;
-import org.jenkinsci.plugins.workflow.flow.FlowDefinitionDescriptor;
-import org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty;
-import org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty;
-import org.kohsuke.accmod.Restricted;
-import org.kohsuke.accmod.restrictions.DoNotUse;
-import org.kohsuke.accmod.restrictions.NoExternalUse;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
-import org.kohsuke.stapler.export.Exported;
-
-///
 
 
 
@@ -195,8 +115,6 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     private static final Logger LOGGER = Logger.getLogger(WorkflowRun.class.getName());
 
-
-    ////////////////////
     public static WorkflowJob jobbers;
 
     private enum StopState {
@@ -221,8 +139,6 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         }
     };
     private transient StreamBuildListener listener;
-
-
 
     private transient boolean allowTerm;
 
@@ -259,7 +175,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     private @CheckForNull List<SCMCheckout> checkouts;
     // TODO could use a WeakReference to reduce memory, but that complicates how we add to it incrementally; perhaps keep a List<WeakReference<ChangeLogSet<?>>>
     private transient List<ChangeLogSet<? extends ChangeLogSet.Entry>> changeSets;
-    public int number;
+
     /** True when first started, false when running after a restart. */
     private transient boolean firstTime;
     private transient LazyBuildMixIn<WorkflowJob,WorkflowRun> buildMixIn;
@@ -267,7 +183,6 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     public WorkflowRun(WorkflowJob job) throws IOException {
         super(job);
         this.jobbers = job;
-        number = this.getNumber();
         firstTime = true;
         checkouts = new PersistedList<>(this);
         //System.err.printf("created %s @%h%n", this, this);
@@ -282,7 +197,6 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     @Exported
     public final void getRunAction(){
         List<? extends Action> j = jobbers.getAllActions();
-        Action a = null;
         int k = 0;
         for(Action act:j){
             if(k==4 && checkIfActionExist(act)) {
@@ -303,6 +217,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         }
         return !found;
     }
+
     @Exported
     public static boolean checkAction(Action a){
         boolean test = false;

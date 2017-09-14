@@ -27,7 +27,6 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:p="/lib/hudson/project" xmlns:t="/lib/hudson">
     <p:makeDisabled/>
     <p:projectActionFloatingBox/>
-
     <table style="margin-top: 1em; margin-left:1em;">
         <!-- TODO display prominentActions -->
         <!-- TODO display any workspace(s) if possible -->
@@ -36,8 +35,7 @@
             ${%Recent Changes}
         </t:summary>
     </table>
-    <j:forEach var="a" begin="4" end="4" items="${it.allActions}">
+    <j:forEach var="a" items="${it.allActions}">
         <st:include page="jobMain.jelly" it="${a}" optional="true" />
     </j:forEach>
-
 </j:jelly>

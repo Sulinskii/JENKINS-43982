@@ -61,14 +61,8 @@
                     </t:summary>
                 </j:if>
             </table>
-
             <j:forEach var="a" items="${it.allActions}">
                 <st:include page="summary.jelly" from="${a}" optional="true" it="${a}"/>
-
-            </j:forEach>
-            <j:forEach var="a"  items="${jobbers.actions}">
-                ${a} ${% /t }
-
             </j:forEach>
             <j:forEach var="a" items="${it.allActions}">
                 <st:include page="runMain.jelly" it="${a}" optional="true" />

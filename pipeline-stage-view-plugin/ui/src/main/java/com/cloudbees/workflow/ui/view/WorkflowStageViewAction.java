@@ -9,8 +9,6 @@ import hudson.Extension;
 import hudson.model.Action;
 import jenkins.model.TransientActionFactory;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
-import org.jenkinsci.plugins.workflow.job.WorkflowRun;
-
 import java.util.Collection;
 import java.util.Collections;
 

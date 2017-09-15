@@ -69,8 +69,6 @@ function _render(jobRunsData, onElement, fragCaption) {
         name = '#'+name;
         var $ = jqProxy.getJQuery();
         var runGroup = jobRunsData.runGroups[0];
-        runGroup.fragCaption = fragCaption;
-        runGroup.maxTableEms = runGroup.stageData.length * 10;
         var temp = jobRunsData.runGroups[0].runs.length;
         var data = jobRunsData.runGroups[0];
         for(var j=0;j<temp;j++){
@@ -79,12 +77,7 @@ function _render(jobRunsData, onElement, fragCaption) {
                 break;
             }
         }
-        for(var i=0;i<data.runs[0].stages.length;i++){
-            data.stageData[i].avgDurationMillisNoPause = data.runs[0].stages[i].durationMillisNoPause;
-            if(isNaN(data.stageData[i].avgDurationMillisNoPause)){
-                data.stageData[i].avgDurationMillisNoPause = 0;
-            }
-        }
+
         data.fragCaption = fragCaption;
         data.maxTableEms = runGroup.stageData.length * 10;
         var pipelineStagedDom = templates.apply('one-run-pipeline', data);

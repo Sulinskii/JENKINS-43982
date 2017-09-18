@@ -1,3 +1,3 @@
 # workflow-job
 
-Displaying stage view of every run
+Displaying stage view of run in run page

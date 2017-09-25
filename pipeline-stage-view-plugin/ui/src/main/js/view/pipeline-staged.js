@@ -56,10 +56,8 @@ function _render(jobRunsData, onElement, fragCaption) {
     if (jobRunsData.runGroups && jobRunsData.runGroups.length > 0) {
         var $ = jqProxy.getJQuery();
         var runGroup = jobRunsData.runGroups[0];
-
         runGroup.fragCaption = fragCaption;
         runGroup.maxTableEms = runGroup.stageData.length * 10;
-
         var pipelineStagedDom = templates.apply('pipeline-staged', runGroup);
         addLaneCharts(pipelineStagedDom, runGroup);
         var viewPort = $('div.table-viewPort');

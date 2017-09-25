@@ -53,7 +53,6 @@ function cacheRunStages(run) {
 }
 
 exports.getJobRuns = function(jobUrl, success, params) {
-    console.log('jobUrl', jobUrl);
     ajax.execAsyncGET([jobUrl, 'wfapi', 'runs'], function(obj) {
         // Cache the stages for the run
         for (var i=0; i < obj.length; i++) {
@@ -67,11 +66,9 @@ exports.getDescription = function(of, success) {
     var url;
     if (typeof of === 'string') {
         url = of;
-        console.log('1', url);
     } else if (typeof of === 'object') {
         if (!of._links) {
             url = of._links.self.href;
-            console.log('2', url);
         }
     } else {
         console.error("Request to get description using a type other than 'string' or 'object'.");

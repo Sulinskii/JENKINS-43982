@@ -36,7 +36,6 @@ exports.concatPathTokens = function (tokens) {
                 concatedString += '/' + exports.trimSlashes(tokens[index]);
             }
         }
-        console.log(concatedString);
         return concatedString;
     }
 }

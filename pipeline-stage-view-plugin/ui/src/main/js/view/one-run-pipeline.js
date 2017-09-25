@@ -54,6 +54,8 @@ function _render(jobRunsData, onElement, fragCaption) {
     // The expected model is that produced by ui/src/main/js/model/runs-stage-grouped.js
 
     if (jobRunsData.runGroups && jobRunsData.runGroups.length > 0) {
+        var $ = jqProxy.getJQuery();
+        var runGroup = jobRunsData.runGroups[0];
         var name = ''
         var url = window.location.href;
         for(var i=url.length-1;i>=0;i--){
@@ -67,8 +69,6 @@ function _render(jobRunsData, onElement, fragCaption) {
         }
         name = name.split("").reverse().join("");
         name = '#'+name;
-        var $ = jqProxy.getJQuery();
-        var runGroup = jobRunsData.runGroups[0];
         var temp = jobRunsData.runGroups[0].runs.length;
         var data = jobRunsData.runGroups[0];
         for(var j=0;j<temp;j++){
@@ -77,7 +77,6 @@ function _render(jobRunsData, onElement, fragCaption) {
                 break;
             }
         }
-
         data.fragCaption = fragCaption;
         data.maxTableEms = runGroup.stageData.length * 10;
         var pipelineStagedDom = templates.apply('one-run-pipeline', data);
@@ -163,15 +162,10 @@ function addExtensionPoints(onElement, runGroupData) {
 
     // Find all runs.
     var runs = $('.job', onElement);
-    console.log(runs);
-    var BreakException = {};
-    var i=1;
-    try {
     runs.each(function() {
-
         var run = $(this);
-        var runId = '38';
-        console.log(runId);
+        var runId = run.attr('data-runId');
+
         if (!runId) {
             console.warn('No "data-runId" on run.');
             return;
@@ -211,11 +205,7 @@ function addExtensionPoints(onElement, runGroupData) {
             // Putting them in private for now so as discourage external use.
             extensionPoint._private._links = stageObj._links;
         });
-        if (i === 1) throw BreakException;
     });
-    } catch (e){
-        if (e !== BreakException) throw e;
-    }
 
     // We've changed the set of ExtensionPoints, so notify anyone
     // that's interested.

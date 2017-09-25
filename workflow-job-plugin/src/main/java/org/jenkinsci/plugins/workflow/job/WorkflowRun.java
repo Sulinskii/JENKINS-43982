@@ -115,7 +115,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     private static final Logger LOGGER = Logger.getLogger(WorkflowRun.class.getName());
 
-    public static WorkflowJob jobbers;
+    public static WorkflowJob jobInRun;
 
     private enum StopState {
         TERM, KILL;
@@ -182,7 +182,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     public WorkflowRun(WorkflowJob job) throws IOException {
         super(job);
-        this.jobbers = job;
+        this.jobInRun = job;
         firstTime = true;
         checkouts = new PersistedList<>(this);
         //System.err.printf("created %s @%h%n", this, this);
@@ -190,20 +190,18 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     public WorkflowRun(WorkflowJob job, File dir) throws IOException {
         super(job, dir);
-        this.jobbers = job;
+        this.jobInRun = job;
         //System.err.printf("loaded %s @%h%n", this, this);
     }
 
     @Exported
-    public final void getRunAction(){
-        List<? extends Action> j = jobbers.getAllActions();
-        int k = 0;
-        for(Action act:j){
-            if(k==4 && checkIfActionExist(act)) {
+    public void getRunAction(){
+        List<? extends Action> r = jobInRun.getAllActions();
+        for(Action act:r){
+            if(act.getClass().toString().equals("class com.cloudbees.workflow.ui.view.WorkflowStageViewAction") && checkIfActionExist(act)) {
                 addAction(act);
                 break;
             }
-            k++;
         }
     }
 
@@ -219,14 +217,18 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     }
 
     @Exported
-    public static boolean checkAction(Action a){
+    public boolean checkAction(Action a){
         boolean test = false;
-        if(a.getDisplayName().equals("Full Stage View")){
+        if (a.getClass().toString() == null) {
+            throw new IllegalStateException("name of action is null");
+        }
+        else if(a.getClass().toString().equals("class com.cloudbees.workflow.ui.view.WorkflowStageViewAction")){
             test = true;
         }
 
         return !test;
     }
+
     @Override public LazyBuildMixIn.RunMixIn<WorkflowJob,WorkflowRun> getRunMixIn() {
         return runMixIn;
     }
@@ -977,7 +979,6 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
                 logsToCopy.put(node.getId(), 0L);
             }
             node.addAction(new TimingAction());
-            //node.addAction(getJobActions());
             logNodeMessage(node);
             if (node instanceof FlowEndNode) {
                 finish(((FlowEndNode) node).getResult(), execution != null ? execution.getCauseOfFailure() : null);

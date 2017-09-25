@@ -60,10 +60,10 @@
                         </j:forEach>
                     </t:summary>
                 </j:if>
+                <j:forEach var="a" items="${it.allActions}">
+                    <st:include page="summary.jelly" from="${a}" optional="true" it="${a}"/>
+                </j:forEach>
             </table>
-            <j:forEach var="a" items="${it.allActions}">
-                <st:include page="summary.jelly" from="${a}" optional="true" it="${a}"/>
-            </j:forEach>
             <j:forEach var="a" items="${it.allActions}">
                 <st:include page="runMain.jelly" it="${a}" optional="true" />
             </j:forEach>

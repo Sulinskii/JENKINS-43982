@@ -7,8 +7,3 @@
 <j:jelly xmlns:j="jelly:core" xmlns:wf="/com/cloudbees/workflow">
     <wf:controller name="pipeline-staged" fragCaption="Stage View" />
 </j:jelly>
-
-
-
-
-

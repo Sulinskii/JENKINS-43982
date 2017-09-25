@@ -11,7 +11,6 @@ import jenkins.model.TransientActionFactory;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import java.util.Collection;
 import java.util.Collections;
-
 /**
  * {@link WorkflowJob} ui extension point {@link Action}.
  *

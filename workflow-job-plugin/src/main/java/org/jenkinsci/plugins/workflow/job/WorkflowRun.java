@@ -24,7 +24,6 @@
 
 package org.jenkinsci.plugins.workflow.job;
 
-
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -34,36 +33,50 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import hudson.*;
+import hudson.AbortException;
+import hudson.EnvVars;
+import hudson.Extension;
+import hudson.FilePath;
+import hudson.Functions;
+import hudson.XmlFile;
 import hudson.console.AnnotatedLargeText;
 import hudson.console.LineTransformationOutputStream;
 import hudson.console.ModelHyperlinkNote;
-import hudson.init.InitMilestone;
-import hudson.init.Initializer;
 import hudson.model.*;
-import hudson.model.Executor;
-import hudson.model.Queue;
 import hudson.model.listeners.RunListener;
 import hudson.model.listeners.SCMListener;
-import hudson.model.queue.CauseOfBlockage;
 import hudson.scm.ChangeLogSet;
-import hudson.scm.PollingResult;
 import hudson.scm.SCM;
 import hudson.scm.SCMRevisionState;
 import hudson.security.ACL;
 import hudson.slaves.NodeProperty;
-import hudson.triggers.Trigger;
-import hudson.triggers.TriggerDescriptor;
-import hudson.util.*;
-
+import hudson.util.DaemonThreadFactory;
+import hudson.util.Iterators;
+import hudson.util.NamingThreadFactory;
+import hudson.util.NullStream;
+import hudson.util.PersistedList;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -71,30 +84,31 @@ import java.util.logging.Logger;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
-
 import jenkins.model.CauseOfInterruption;
 import jenkins.model.Jenkins;
-import jenkins.model.ParameterizedJobMixIn;
-import jenkins.model.TransientActionFactory;
 import jenkins.model.lazy.BuildReference;
 import jenkins.model.lazy.LazyBuildMixIn;
 import jenkins.model.queue.AsynchronousExecution;
 import jenkins.scm.RunWithSCM;
 import jenkins.security.NotReallyRoleSensitiveCallable;
-import jenkins.triggers.SCMTriggerItem;
 import jenkins.util.Timer;
 import org.acegisecurity.Authentication;
 import org.jenkinsci.plugins.workflow.FilePathUtils;
 import org.jenkinsci.plugins.workflow.actions.LogAction;
 import org.jenkinsci.plugins.workflow.actions.ThreadNameAction;
 import org.jenkinsci.plugins.workflow.actions.TimingAction;
-import org.jenkinsci.plugins.workflow.flow.*;
+import org.jenkinsci.plugins.workflow.flow.FlowCopier;
+import org.jenkinsci.plugins.workflow.flow.FlowDefinition;
+import org.jenkinsci.plugins.workflow.flow.FlowExecution;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionList;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionListener;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
+import org.jenkinsci.plugins.workflow.flow.GraphListener;
+import org.jenkinsci.plugins.workflow.flow.StashManager;
 import org.jenkinsci.plugins.workflow.graph.BlockEndNode;
 import org.jenkinsci.plugins.workflow.graph.FlowEndNode;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.job.console.WorkflowConsoleLogger;
-import org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty;
-import org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty;
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
 import org.jenkinsci.plugins.workflow.steps.StepExecution;
@@ -107,15 +121,13 @@ import org.kohsuke.stapler.HttpResponses;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.interceptor.RequirePOST;
 
-
-
 @SuppressWarnings("SynchronizeOnNonFinalField")
 @SuppressFBWarnings(value="JLM_JSR166_UTILCONCURRENT_MONITORENTER", justification="completed is an unusual usage")
 public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements FlowExecutionOwner.Executable, LazyBuildMixIn.LazyLoadingRun<WorkflowJob,WorkflowRun>, RunWithSCM<WorkflowJob,WorkflowRun> {
 
     private static final Logger LOGGER = Logger.getLogger(WorkflowRun.class.getName());
 
-    public static WorkflowJob jobInRun;
+    WorkflowJob jobInRun;
 
     private enum StopState {
         TERM, KILL;
@@ -178,11 +190,10 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     /** True when first started, false when running after a restart. */
     private transient boolean firstTime;
-    private transient LazyBuildMixIn<WorkflowJob,WorkflowRun> buildMixIn;
 
     public WorkflowRun(WorkflowJob job) throws IOException {
         super(job);
-        this.jobInRun = job;
+        jobInRun = job;
         firstTime = true;
         checkouts = new PersistedList<>(this);
         //System.err.printf("created %s @%h%n", this, this);
@@ -190,7 +201,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
 
     public WorkflowRun(WorkflowJob job, File dir) throws IOException {
         super(job, dir);
-        this.jobInRun = job;
+        jobInRun = job;
         //System.err.printf("loaded %s @%h%n", this, this);
     }
 
@@ -217,12 +228,11 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     }
 
     @Exported
-    public boolean checkAction(Action a){
+    public boolean checkAction(Action a) {
         boolean test = false;
         if (a.getClass().toString() == null) {
             throw new IllegalStateException("name of action is null");
-        }
-        else if(a.getClass().toString().equals("class com.cloudbees.workflow.ui.view.WorkflowStageViewAction")){
+        } else if (a.getClass().toString().equals("class com.cloudbees.workflow.ui.view.WorkflowStageViewAction")) {
             test = true;
         }
 
@@ -254,13 +264,11 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     /**
      * Actually executes the workflow.
      */
-
     @Override public void run() {
         if (!firstTime) {
             throw sleep();
         }
         try {
-
             onStartBuilding();
             OutputStream logger = new FileOutputStream(getLogFile());
             listener = new StreamBuildListener(logger, Charset.defaultCharset());
@@ -280,6 +288,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
                 throw new AbortException("No flow definition, cannot run");
             }
             Owner owner = new Owner(this);
+            
             FlowExecution newExecution = definition.create(owner, listener, getAllActions());
             FlowExecutionList.get().register(owner);
             newExecution.addListener(new GraphL());
@@ -289,6 +298,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
             newExecution.start();
             executionPromise.set(newExecution);
             FlowExecutionListener.fireRunning(execution);
+
         } catch (Throwable x) {
             execution = null; // ensures isInProgress returns false
             finish(Result.FAILURE, x);
@@ -695,10 +705,16 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         duration = Math.max(0, System.currentTimeMillis() - getStartTimeInMillis());
         try {
             save();
-            getParent().logRotate();
         } catch (Exception x) {
-            LOGGER.log(Level.WARNING, "failed to save " + this + " or perform log rotation", x);
+            LOGGER.log(Level.WARNING, "failed to save " + this, x);
         }
+        Timer.get().submit(() -> {
+            try {
+                getParent().logRotate();
+            } catch (Exception x) {
+                LOGGER.log(Level.WARNING, "failed to perform log rotation after " + this, x);
+            }
+        });
         onEndBuilding();
         if (completed != null) {
             synchronized (completed) {
@@ -811,6 +827,12 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
     }
 
     @Override
+    @Exported
+    @Nonnull public Set<User> getCulprits() {
+        return RunWithSCM.super.getCulprits();
+    }
+
+    @Override
     public boolean shouldCalculateCulprits() {
         return isBuilding() || culprits == null;
     }
@@ -862,13 +884,14 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         }
     }
 
-    public static final class Owner extends FlowExecutionOwner {
+    private static final class Owner extends FlowExecutionOwner {
         private final String job;
         private final String id;
         private transient @CheckForNull WorkflowRun run;
         Owner(WorkflowRun run) {
             job = run.getParent().getFullName();
             id = run.getId();
+            this.run = run;
         }
         private String key() {
             return job + '/' + id;
@@ -906,12 +929,18 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         @Override public FlowExecution get() throws IOException {
             WorkflowRun r = run();
             synchronized (LOADING_RUNS) {
-                while (r.execution == null && LOADING_RUNS.containsKey(key())) {
+                int count = 5;
+                while (r.execution == null && LOADING_RUNS.containsKey(key()) && count-- > 0) {
+                    Thread thread = Thread.currentThread();
+                    String origName = thread.getName();
+                    thread.setName(origName + ": waiting for " + key());
                     try {
-                        LOADING_RUNS.wait();
+                        LOADING_RUNS.wait(/* 1m */60_000);
                     } catch (InterruptedException x) {
                         LOGGER.log(Level.WARNING, "failed to wait for " + r + " to be loaded", x);
                         break;
+                    } finally {
+                        thread.setName(origName);
                     }
                 }
             }
@@ -979,6 +1008,7 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
                 logsToCopy.put(node.getId(), 0L);
             }
             node.addAction(new TimingAction());
+
             logNodeMessage(node);
             if (node instanceof FlowEndNode) {
                 finish(((FlowEndNode) node).getResult(), execution != null ? execution.getCauseOfFailure() : null);
@@ -1006,8 +1036,8 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
         // if we don't flush the logger here.
         wfLogger.getLogger().flush();
     }
-    @Initializer(before=InitMilestone.EXTENSIONS_AUGMENTED)
-    public static void alias() {
+
+    static void alias() {
         Run.XSTREAM2.alias("flow-build", WorkflowRun.class);
         new XmlFile(null).getXStream().aliasType("flow-owner", Owner.class); // hack! but how else to set it for arbitrary Descriptor’s?
         Run.XSTREAM2.aliasType("flow-owner", Owner.class);
@@ -1019,5 +1049,16 @@ public final class WorkflowRun extends Run<WorkflowJob,WorkflowRun> implements F
                 ((WorkflowRun) build).onCheckout(scm, workspace, listener, changelogFile, pollingBaseline);
             }
         }
+    }
+
+    @Restricted(DoNotUse.class) // impl
+    @Extension public static class Checkouts extends FlowCopier.ByRun {
+
+        @Override public void copy(Run<?, ?> original, Run<?, ?> copy, TaskListener listener) throws IOException, InterruptedException {
+            if (original instanceof WorkflowRun && copy instanceof WorkflowRun) {
+                ((WorkflowRun)copy).checkouts(null).addAll(((WorkflowRun)original).checkouts(null));
+            }
+        }
+
     }
 }
